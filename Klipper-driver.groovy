@@ -80,7 +80,7 @@ def logDebug(string){
 
 def printerOffline(status){
     if (longCheck != 0) runIn(longCheck, GetStatus)
-    if (device.currentValue("status") != resp.state.text){
+    if (device.currentValue("status") != status){
         sendEvent(name: "switch", value: "off", isStateChange: true)
         sendEvent(name: "status", value: status)
         sendEvent(name: "bed-target", value: 0)
