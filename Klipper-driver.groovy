@@ -2,9 +2,11 @@
 // Created by jebbett/n3rding 2021
 // Uses the Moonraker API (Used with Klipper / Fluidd)
 // https://moonraker.readthedocs.io/en/latest/web_api/
+// Assumed possible status' "Operational", "Printing", "Pausing", "Paused", "Cancelling", "Error", "Offline", "Disconnected","HostOffline","Complete"
 //
 // V0.1    2021-12-18    Initial Code
 // V0.2    2021-12-18    Fixed offline status check
+// V0.3    2021-12-18    Added "Complete" status and updated above with expected status' for reference
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -128,7 +130,11 @@ def GetStatus(){
         sendEvent(name: "tool0-actual", value: resp.temperature.tool0.actual)
         
         print = queryPrinter("/printer/objects/query","fan&print_stats&display_status")
-        status = print.result.status
+        if (status == "Printing" && print.result.status == "Operational") {
+            status = "Complete"
+        }else{
+            status = print.result.status
+        }
         filename = status.print_stats.filename
         printTime = status.print_stats.print_duration.toInteger()
         printPercent = (status.display_status.progress * 100).toDouble()
