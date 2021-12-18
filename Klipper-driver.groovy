@@ -4,6 +4,7 @@
 // https://moonraker.readthedocs.io/en/latest/web_api/
 //
 // V0.1    2021-12-18    Initial Code
+// V0.2    2021-12-18    Fixed offline status check
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
