@@ -7,6 +7,7 @@
 // V0.1    2021-12-18    Initial Code
 // V0.2    2021-12-18    Fixed offline status check
 // V0.3    2021-12-18    Added "Complete" status and updated above with expected status' for reference
+// V0.4    2022-03-18    Various fixes
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -135,17 +136,18 @@ def GetStatus(){
         }else{
             status = print.result.status
         }
-        filename = status.print_stats.filename
+        fn = status.print_stats.filename.replace(" ", "%20")
         printTime = status.print_stats.print_duration.toInteger()
         printPercent = (status.display_status.progress * 100).toDouble()
-        if (filename) {
-            gcode = queryPrinter("/server/files/metadata","filename=${filename}")
+        if (fn) {
+            gcode = queryPrinter("/server/files/metadata","filename=${fn}")
             estTime = gcode.result.estimated_time.toInteger()
             if (printTime == 0){
                 remTime == estTime
             }else{
                 remTime = (((printTime / printPercent)*100) - printTime).toInteger()
             }
+            if (!remTime){remTime = 0} //set to zero if no time yet
         }else{
             estTime = 0
             remTime = 0
@@ -156,7 +158,7 @@ def GetStatus(){
         sendEvent(name: "print-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, printTime, 0 ).time.format('HH:mm:ss'))
         sendEvent(name: "total-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, status.print_stats.total_duration.toInteger(), 0 ).time.format('HH:mm:ss'))
         sendEvent(name: "filament-used-mm", value: status.print_stats.filament_used.toInteger())
-        sendEvent(name: "filename", value: filename)
+        sendEvent(name: "filename", value: status.print_stats.filename)
         sendEvent(name: "message", value: status.print_stats.message)
         sendEvent(name: "slicer-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, estTime, 0 ).time.format('HH:mm:ss'))
         sendEvent(name: "hubitat-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, remTime, 0 ).time.format('HH:mm:ss'))
