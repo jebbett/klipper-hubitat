@@ -160,7 +160,7 @@ def GetStatus(){
         sendEvent(name: "filament-used-mm", value: status.print_stats.filament_used.toInteger())
         sendEvent(name: "filename", value: status.print_stats.filename)
         sendEvent(name: "message", value: status.print_stats.message)
-        sendEvent(name: "slicer-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, estTime, 0 ).time.format('HH:mm:ss'))
+        sendEvent(name: "slicer-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, estTime - printTime, 0 ).time.format('HH:mm:ss'))
         sendEvent(name: "hubitat-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, remTime, 0 ).time.format('HH:mm:ss'))
         
         //Schedule timer
