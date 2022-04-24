@@ -8,6 +8,7 @@
 // V0.2    2021-12-18    Fixed offline status check
 // V0.3    2021-12-18    Added "Complete" status and updated above with expected status' for reference
 // V0.4    2022-03-18    Various fixes
+// V0.5    2022-04-24    Changed RunIn to Schedule, changed checks from seconds to minutes in settings
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -51,8 +52,8 @@ metadata {
         section("Device Settings:") {
             input "ip", "string", title:"IP Address", description: "", required: true, displayDuringSetup: true
             input "port", "string", title:"Port", description: "", required: true, displayDuringSetup: true, defaultValue: "80"
-            input "longCheck", "number", title:"How often to check if printer is printing (seconds)", description: "Set to 0 for none", required: true, displayDuringSetup: true, defaultValue: "600"
-            input "shortCheck", "number", title:"How often to update while printing (seconds)", description: "Set to 0 for none", required: true, displayDuringSetup: true, defaultValue: "60"
+            input "longCheck", "number", title:"How often to check if printer is printing (minutes)", description: "Set to 0 for none", required: true, displayDuringSetup: true, defaultValue: "10", range:"0..59"
+            input "shortCheck", "number", title:"How often to update while printing (minutes)", description: "Set to 0 for none", required: true, displayDuringSetup: true, defaultValue: "1", range:"0..59"
             input name: "onWhilePrinting", type: "bool", title: "Shows device as 'On' only while printing", defaultValue: false
             input name: "logging", type: "bool", title: "Enable debug logging", defaultValue: false 
         }
@@ -83,7 +84,7 @@ def logDebug(string){
 }
 
 def printerOffline(status){
-    if (longCheck != 0) runIn(longCheck, GetStatus)
+    if (longCheck != 0) schedule('* 0/' + longCheck + ' * ? * * *', GetStatus) //runIn(longCheck, GetStatus)
     if (device.currentValue("status") != status){
         sendEvent(name: "switch", value: "off", isStateChange: true)
         sendEvent(name: "status", value: status)
@@ -166,9 +167,9 @@ def GetStatus(){
         //Schedule timer
         if(resp.state.text in printing && shortCheck != 0){
             //If printing, paused, cancelling or pausing state (actively doing something) set short timer
-            runIn(shortCheck, GetStatus)
+            schedule('* 0/' + shortCheck + ' * ? * * *', GetStatus)
         }else if (longCheck != 0) {
-            runIn(longCheck, GetStatus)
+            schedule('* 0/' + longCheck + ' * ? * * *', GetStatus)
         }
     }
 }
