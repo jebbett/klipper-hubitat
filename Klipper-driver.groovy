@@ -9,6 +9,7 @@
 // V0.3    2021-12-18    Added "Complete" status and updated above with expected status' for reference
 // V0.4    2022-03-18    Various fixes
 // V0.5    2022-04-24    Changed RunIn to Schedule, changed checks from seconds to minutes in settings
+// V0.6    2022-07-09    Fixed refresh rate, fixed multiple updates when single update requested and changed temps to Integers
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -66,11 +67,11 @@ void initialize(){
 
 def updated(){
 	sendEvent(name: "status", value: "Waiting Update" )
+    unschedule()
     if (logging) {
 		log.warn "Debug logging enabled for 30 mins..."
 		runIn(1800,logsDisabled)
     }
-	unschedule()
     GetStatus()
 }
 
@@ -84,7 +85,7 @@ def logDebug(string){
 }
 
 def printerOffline(status){
-    if (longCheck != 0) schedule('* 0/' + longCheck + ' * ? * * *', GetStatus) //runIn(longCheck, GetStatus)
+    if (longCheck != 0) schedule('0 */' + longCheck + ' * ? * *', GetStatus) //runIn(longCheck, GetStatus)
     if (device.currentValue("status") != status){
         sendEvent(name: "switch", value: "off", isStateChange: true)
         sendEvent(name: "status", value: status)
@@ -121,25 +122,26 @@ def GetStatus(){
         sendEvent(name: "status", value: resp.state.text)
         // Set switch to On if in a printing state or if "On" while printing is false
         if(!onWhilePrinting || resp.state.text in printing){
-            sendEvent(name: "switch", value: "on", isStateChange: true)
+            if (device.currentValue("switch") != "on") sendEvent(name: "switch", value: "on", isStateChange: true) 
         }else{
             sendEvent(name: "switch", value: "off", isStateChange: true)
         }
 
         sendEvent(name: "bed-target", value: resp.temperature.bed.target)
-        sendEvent(name: "bed-actual", value: resp.temperature.bed.actual)
+        sendEvent(name: "bed-actual", value: resp.temperature.bed.actual.toInteger())
         sendEvent(name: "tool0-target", value: resp.temperature.tool0.target)
-        sendEvent(name: "tool0-actual", value: resp.temperature.tool0.actual)
+        sendEvent(name: "tool0-actual", value: resp.temperature.tool0.actual.toInteger())
         
         print = queryPrinter("/printer/objects/query","fan&print_stats&display_status")
+        pstat = print.result.status
         if (status == "Printing" && print.result.status == "Operational") {
             status = "Complete"
         }else{
-            status = print.result.status
+            status = pstat.print_stats.state
         }
-        fn = status.print_stats.filename.replace(" ", "%20")
-        printTime = status.print_stats.print_duration.toInteger()
-        printPercent = (status.display_status.progress * 100).toDouble()
+        fn = pstat.print_stats.filename.replace(" ", "%20")
+        printTime = pstat.print_stats.print_duration.toInteger()
+        printPercent = (pstat.display_status.progress * 100).toDouble()
         if (fn) {
             gcode = queryPrinter("/server/files/metadata","filename=${fn}")
             estTime = gcode.result.estimated_time.toInteger()
@@ -154,22 +156,22 @@ def GetStatus(){
             remTime = 0
         }
         
-        sendEvent(name: "fan-percent", value: status.fan.speed.toInteger() * 100)
-        sendEvent(name: "print-percent", value: printPercent.round(1))
+        sendEvent(name: "fan-percent", value: pstat.fan.speed.toInteger() * 100)
+        sendEvent(name: "print-percent", value: printPercent.toInteger())
         sendEvent(name: "print-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, printTime, 0 ).time.format('HH:mm:ss'))
-        sendEvent(name: "total-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, status.print_stats.total_duration.toInteger(), 0 ).time.format('HH:mm:ss'))
-        sendEvent(name: "filament-used-mm", value: status.print_stats.filament_used.toInteger())
-        sendEvent(name: "filename", value: status.print_stats.filename)
-        sendEvent(name: "message", value: status.print_stats.message)
+        sendEvent(name: "total-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, pstat.print_stats.total_duration.toInteger(), 0 ).time.format('HH:mm:ss'))
+        sendEvent(name: "filament-used-mm", value: pstat.print_stats.filament_used.toInteger())
+        sendEvent(name: "filename", value: pstat.print_stats.filename)
+        sendEvent(name: "message", value: pstat.print_stats.message)
         sendEvent(name: "slicer-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, estTime - printTime, 0 ).time.format('HH:mm:ss'))
         sendEvent(name: "hubitat-est-time", value: new GregorianCalendar( 0, 0, 0, 0, 0, remTime, 0 ).time.format('HH:mm:ss'))
         
         //Schedule timer
         if(resp.state.text in printing && shortCheck != 0){
             //If printing, paused, cancelling or pausing state (actively doing something) set short timer
-            schedule('* 0/' + shortCheck + ' * ? * * *', GetStatus)
+            schedule('0 */' + shortCheck + ' * ? * *', GetStatus)
         }else if (longCheck != 0) {
-            schedule('* 0/' + longCheck + ' * ? * * *', GetStatus)
+            schedule('0 */' + longCheck + ' * ? * *', GetStatus)
         }
     }
 }
