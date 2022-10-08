@@ -11,7 +11,7 @@
 // V0.5    2022-04-24    Changed RunIn to Schedule, changed checks from seconds to minutes in settings
 // V0.6    2022-07-09    Fixed refresh rate, fixed multiple updates when single update requested and changed temps to Integers
 // V0.7    2022-08-06    Fixed "Complete" status reporting and added option to enable detailed reporting (previous was creating too much noise)
-// 
+// V0.8    2022-10-08    Fixed everything I broke in the last update 
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -124,11 +124,7 @@ def GetStatus(){
         printerOffline(resp.state.text)
     }else{
         pstatus = resp.state.text
-        if (device.currentValue("status") == "Printing" && pstatus == "Operational") {
-            pstatus = "Complete"
-        }else{
-            pstatus = pstat.print_stats.state
-        }
+        if (device.currentValue("status") == "Printing" && pstatus == "Operational") { pstatus = "Complete" }
         sendEvent(name: "status", value: pstatus)
         // Set switch to On if in a printing state or if "On" while printing is false
         if(!onWhilePrinting || resp.state.text in printing){
