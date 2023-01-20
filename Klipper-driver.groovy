@@ -14,6 +14,7 @@
 // V0.7    2022-08-06    Fixed "Complete" status reporting and added option to enable detailed reporting (previous was creating too much noise)
 // V0.8    2022-10-08    Fixed everything I broke in the last update 
 // V0.9    2023-01-20	 Error handling for host/meta data not found, supressed error on offline while degugging off
+// V0.10   2023-01-20	 Added replace("+", "%2B")
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -150,7 +151,7 @@ def GetStatus(){
         print = queryPrinter("/printer/objects/query","fan&print_stats&display_status")
         if(print){
             pstat = print.result.status
-            fn = pstat.print_stats.filename.replace(" ", "%20")
+            fn = pstat.print_stats.filename.replace(" ", "%20").replace("+", "%2B")
             printTime = pstat.print_stats.print_duration.toInteger()
             printPercent = (pstat.display_status.progress * 100).toDouble()
             if (fn) {
