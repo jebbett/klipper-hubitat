@@ -2,6 +2,7 @@
 // Created by jebbett/n3rding 2021
 // Uses the Moonraker API (Used with Klipper / Fluidd)
 // https://moonraker.readthedocs.io/en/latest/web_api/
+//
 // Assumed possible status' "Operational", "Printing", "Pausing", "Paused", "Cancelling", "Error", "Offline", "Disconnected","HostOffline","Complete"
 //
 // V0.1    2021-12-18    Initial Code
@@ -12,6 +13,7 @@
 // V0.6    2022-07-09    Fixed refresh rate, fixed multiple updates when single update requested and changed temps to Integers
 // V0.7    2022-08-06    Fixed "Complete" status reporting and added option to enable detailed reporting (previous was creating too much noise)
 // V0.8    2022-10-08    Fixed everything I broke in the last update 
+// V0.9    2023-01-20	 Error handling for host/meta data not found, supressed error on offline while degugging off
 //
 metadata {
     definition (name: "Klipper", namespace: "klipper-hubitat", author: "jebbett") {
@@ -59,7 +61,8 @@ metadata {
             input "shortCheck", "number", title:"How often to update while printing (minutes)", description: "Set to 0 for none", required: true, displayDuringSetup: true, defaultValue: "1", range:"0..59"
             input "reportDet", "bool", title:"Detailed Reporting", description: "Adding these stats can cause higher load on the platform", defaultValue: false 
             input name: "onWhilePrinting", type: "bool", title: "Shows device as 'On' only while printing", defaultValue: false
-            input name: "logging", type: "bool", title: "Enable debug logging", defaultValue: false 
+            //input "devPwrList", type: "enum", title: "Power Control Devices", required: false, multiple: true, options: state.pwrDevs, displayDuringSetup: false
+            input name: "logging", type: "bool", title: "Enable debug logging", defaultValue: false
         }
     }
 }        
@@ -69,6 +72,8 @@ void initialize(){
 }
 
 def updated(){
+    if(!state.pwrDevs) state.pwrDevs = []
+    getPwrDevs()
 	sendEvent(name: "status", value: "Waiting Update" )
     unschedule()
     if (logging) {
@@ -143,24 +148,26 @@ def GetStatus(){
         
         
         print = queryPrinter("/printer/objects/query","fan&print_stats&display_status")
-        pstat = print.result.status
-        fn = pstat.print_stats.filename.replace(" ", "%20")
-        printTime = pstat.print_stats.print_duration.toInteger()
-        printPercent = (pstat.display_status.progress * 100).toDouble()
-        if (fn) {
-            gcode = queryPrinter("/server/files/metadata","filename=${fn}")
-            estTime = gcode.result.estimated_time.toInteger()
-            if (printTime == 0 && reportDet){
-                remTime == estTime
+        if(print){
+            pstat = print.result.status
+            fn = pstat.print_stats.filename.replace(" ", "%20")
+            printTime = pstat.print_stats.print_duration.toInteger()
+            printPercent = (pstat.display_status.progress * 100).toDouble()
+            if (fn) {
+                gcode = queryPrinter("/server/files/metadata","filename=${fn}")
+                estTime = gcode.result.estimated_time.toInteger()
+                if (printTime == 0 && reportDet){
+                    remTime == estTime
+                }else{
+                    remTime = (((printTime / printPercent)*100) - printTime).toInteger()
+                }
+                if (!remTime){remTime = 0} //set to zero if no time yet
             }else{
-                remTime = (((printTime / printPercent)*100) - printTime).toInteger()
+                estTime = 0
+                remTime = 0
             }
-            if (!remTime){remTime = 0} //set to zero if no time yet
-        }else{
-            estTime = 0
-            remTime = 0
         }
-        
+            
         sendEvent(name: "fan-percent", value: pstat.fan.speed.toInteger() * 100)
         sendEvent(name: "print-percent", value: printPercent.toInteger())
         sendEvent(name: "filename", value: pstat.print_stats.filename)
@@ -196,7 +203,7 @@ def queryPrinter(String path, String query = null) {
             }
         }
     } catch (Exception e) {
-        log.warn "Call failed: ${e.message}"
+        logDebug("Call failed: ${e.message}")
         return null
     }
 }
@@ -217,6 +224,16 @@ def postCallBack(response, data){
     if(!response.hasError()) logDebug("response.getData() = ${response.getData()}")    
 }
 
+def getPwrDevs(){
+    def list = []
+    resp = queryPrinter("/machine/device_power/devices")
+    if(resp){
+        resp.result.devices.each { dev ->
+            list << "${dev.device}"
+    		    }
+        state.pwrDevs = list
+    }
+}
 def on(){
 
 }
